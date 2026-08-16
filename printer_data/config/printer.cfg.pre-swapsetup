@@ -17,7 +17,6 @@
 [include bed_dryer.cfg]
 [include heat_soak.cfg]
 [include shell_command.cfg]
-[include mmx_swap.cfg]
 
 
 [auto_speed]
