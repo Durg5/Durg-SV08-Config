@@ -593,11 +593,9 @@ gcode:
     M107
     M109 S{target_extruder}
 
-    {% if printer.mmu is not defined %}
-        M117 The purge...
-        STATUS_CLEANING
-        LINE_PURGE
-    {% endif %}
+    #M117 The purge...
+    #STATUS_CLEANING
+    #LINE_PURGE
 
     M117 Printer goes brrr
     STATUS_PRINTING
@@ -627,9 +625,7 @@ gcode:
         {% set z_safe = max_z - printer.toolhead.position.z %}
     {% endif %}
 
-    {% if printer.mmu is defined %}
-        MMU_END
-    {% endif %}
+    MMU_END
     M400
     G92 E0
     G1 E-4.0 F3600
