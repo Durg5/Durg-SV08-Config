@@ -181,7 +181,7 @@ full_steps_per_rotation: 200		# 200 for 1.8 degree, 400 for 0.9 degree
 [mmu_servo selector_servo]
 pin: mmu:MMU_SEL_SERVO
 maximum_servo_angle: 180
-minimum_pulse_width: 0.00050
+minimum_pulse_width: 0.00070
 maximum_pulse_width: 0.00230
 #
 # OPTIONAL GANTRY SERVO FOR TOOLHEAD FILAMENT CUTTER ------------------------------------------------------------------
