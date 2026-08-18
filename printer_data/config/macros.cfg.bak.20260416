@@ -1,0 +1,621 @@
+# ============================================================
+# macros.cfg - Rebuilt strictly from klippy.log
+# CLEAN_NOZZLE updated with new brush coordinates
+# ============================================================
+
+# ============================================================
+# CLIENT VARIABLES
+# ============================================================
+
+[gcode_macro _CLIENT_VARIABLE]
+variable_use_custom_pos = True
+variable_custom_park_x = 0.0
+variable_custom_park_y = 0.0
+variable_custom_park_dz = 2.0
+variable_retract = 1.0
+variable_cancel_retract = 4.0
+variable_speed_retract = 30.0
+variable_unretract = 1.0
+variable_speed_unretract = 35.0
+variable_speed_hop = 15.0
+variable_speed_move = 100.0
+variable_park_at_cancel = True
+variable_park_at_cancel_x = 300.0
+variable_park_at_cancel_y = 300.0
+variable_use_fw_retract = True
+variable_idle_timeout = 600
+variable_runout_sensor = ""
+variable_user_pause_macro = ""
+variable_user_resume_macro = ""
+variable_user_cancel_macro = ""
+gcode:
+
+# ============================================================
+# FAN OVERRIDES
+# ============================================================
+
+[gcode_macro M106]
+gcode:
+    {% set fan = 'fan' + (params.P|int if params.P is defined else 0)|string %}
+    {% set speed = (params.S|float / 255 if params.S is defined else 1.0) %}
+    {% if fan == 'fan3'%}
+        SET_FAN_SPEED FAN={fan} SPEED={speed}
+    {% else %}
+        SET_FAN_SPEED FAN={'fan0'} SPEED={speed}
+        SET_FAN_SPEED FAN={'fan1'} SPEED={speed}
+    {% endif %}
+
+[gcode_macro M107]
+gcode:
+    {% set fan = 'fan' + (params.P|int if params.P is defined else 0)|string %}
+    {% if fan == 'fan_2'%}
+        SET_FAN_SPEED FAN={fan} SPEED=0
+    {% else %}
+        SET_FAN_SPEED FAN={'fan0'} SPEED=0
+        SET_FAN_SPEED FAN={'fan1'} SPEED=0
+    {% endif %}
+
+[gcode_macro _ALL_FAN_OFF]
+gcode:
+    M106 S0
+    M107
+
+# ============================================================
+# BASIC UTILITIES
+# ============================================================
+
+[gcode_macro M600]
+gcode:
+    PAUSE
+
+[gcode_macro BEEP]
+gcode:
+    SET_PIN PIN=beeper VALUE=1
+    G4 P10
+    SET_PIN PIN=beeper VALUE=0
+
+[gcode_macro LIGHT]
+variable_state = 1
+description: Toggles main LED on/off
+gcode:
+    {% if printer["gcode_macro mainled"].state %}
+        SET_PIN PIN=main_led VALUE=0
+        SET_GCODE_VARIABLE MACRO=mainled VARIABLE=state VALUE=0
+    {% else %}
+        SET_PIN PIN=main_led VALUE=1
+        SET_GCODE_VARIABLE MACRO=mainled VARIABLE=state VALUE=1
+    {% endif %}
+
+[gcode_macro _RESET_TO_HOME]
+gcode:
+    _CLIENT_LINEAR_MOVE Y=350 F=6000 ABSOLUTE=1
+    _CLIENT_LINEAR_MOVE X=350 F=6000 ABSOLUTE=1
+
+[gcode_macro _IDLE_TIMEOUT]
+gcode:
+    {% if printer.print_stats.state == "paused" %}
+        RESPOND TYPE=echo MSG="No operations in 10min!"
+    {% else %}
+        M84
+        TURN_OFF_HEATERS
+    {% endif %}
+
+# ============================================================
+# MOVEMENT
+# ============================================================
+
+[gcode_macro CENTER]
+description: Move the toolhead to the center of objects to be printed, or center of build plate
+gcode:
+    {% set center_x = printer.toolhead.axis_maximum.x / 2 | float %}
+    {% set center_y = printer.toolhead.axis_maximum.y / 2 | float %}
+    {% set all_points = printer.exclude_object.objects | map(attribute='polygon') | sum(start=[]) %}
+    {% set x_min = all_points | map(attribute=0) | min | default(center_x) %}
+    {% set y_min = all_points | map(attribute=1) | min | default(center_y) %}
+    {% set x_max = all_points | map(attribute=0) | max | default(center_x) %}
+    {% set y_max = all_points | map(attribute=1) | max | default(center_y) %}
+    {% set travel_speed = (printer.toolhead.max_velocity) * 30 | float %}
+    {% set center_x = (x_min + x_max) / 2.0 | round(1) %}
+    {% set center_y = (y_min + y_max) / 2.0 | round(1) %}
+    SAVE_GCODE_STATE NAME=Pre_Center_State
+    G90
+    G0 X{center_x} Y{center_y} F{travel_speed}
+    M400
+    RESTORE_GCODE_STATE NAME=Pre_Center_State
+
+[gcode_macro UNSAFE_Z_MOVEMENT]
+description: Move the toolhead in Z without homing. REQUIRES force_move CONFIG! Use positive or negative values.
+gcode:
+    {% set z_movement = params.Z|default(5)|float %}
+    {% if not 'force_move' in printer %}
+        { action_raise_error("This macro requires [force_move] to be enabled in printer.cfg") }
+    {% else %}
+        {% if z_movement < 0 %}
+            { action_respond_info("!!! WARNING: PERFORMING UNSAFE DOWNWARD MOVEMENT !!!") }
+            { action_respond_info("!!! ENSURE ADEQUATE CLEARANCE BELOW NOZZLE !!!") }
+        {% endif %}
+        { action_respond_info("WARNING: Performing unsafe tool movement without homing!") }
+        { action_respond_info("Moving Z by %smm (%s)" % (z_movement, "DOWN" if z_movement < 0 else "UP")) }
+        SAVE_GCODE_STATE NAME=UNSAFE_MOVE
+        G90
+        SET_KINEMATIC_POSITION Z=0
+        G0 Z{z_movement} F300
+        RESTORE_GCODE_STATE NAME=UNSAFE_MOVE
+    {% endif %}
+
+# ============================================================
+# GANTRY LEVELING
+# ============================================================
+
+[gcode_macro QGLx3]
+gcode:
+    CENTER
+    QUAD_GANTRY_LEVEL
+    CENTER
+    QUAD_GANTRY_LEVEL
+    CENTER
+    QUAD_GANTRY_LEVEL
+    CENTER
+
+[gcode_macro GANTRY_LEVELING]
+description: Enhanced Gantry Leveling with automatic detection of QGL or Z-Tilt
+gcode:
+    SAVE_GCODE_STATE NAME=STATE_TRAM
+
+    {% if "xyz" not in printer.toolhead.homed_axes %}
+        STATUS_HOMING
+        M117 Homing all axes first
+        G28
+    {% elif 'z' not in printer.toolhead.homed_axes %}
+        STATUS_HOMING
+        M117 Homing Z axis
+        G28 Z
+    {% endif %}
+
+    {% if 'quad_gantry_level' in printer %}
+        {% if not printer.quad_gantry_level.applied %}
+            STATUS_LEVELING
+            M117 Performing Quad Gantry Level
+            QUAD_GANTRY_LEVEL horizontal_move_z=5 retry_tolerance=1
+            QUAD_GANTRY_LEVEL horizontal_move_z=2
+            STATUS_HOMING
+            M117 Re-homing Z after QGL
+            G28 Z
+        {% else %}
+            M117 QGL already applied
+        {% endif %}
+    {% elif 'z_tilt' in printer %}
+        M117 Performing Z-Tilt Adjustment
+        Z_TILT_ADJUST RETRY_TOLERANCE=1
+        Z_TILT_ADJUST
+        M117 Re-homing Z after Z-Tilt
+        G28 Z
+    {% else %}
+        M117 No QGL or Z-Tilt available - Use SCREWS_TILT_CALCULATE
+        RESPOND TYPE=error MSG="Neither Quad Gantry Level nor Z-Tilt configurations found"
+        RESPOND TYPE=command MSG="Try running: SCREWS_TILT_CALCULATE"
+    {% endif %}
+
+    M117 Gantry Calibration Complete
+    RESTORE_GCODE_STATE NAME=STATE_TRAM
+
+[gcode_macro G34]
+description: G34 - Quad Gantry Level with conditional homing. Homes if needed, performs QGL, then homes Z again.
+gcode:
+    STATUS_HOMING
+    {% if "xyz" not in printer.toolhead.homed_axes %}
+        G28
+    {% elif 'z' not in printer.toolhead.homed_axes %}
+        G28 Z
+    {% endif %}
+
+    STATUS_LEVELING
+    QUAD_GANTRY_LEVEL
+
+    STATUS_HOMING
+    G28 Z
+
+# ============================================================
+# BED MESH
+# ============================================================
+
+[gcode_macro G29]
+description: Performs Quad Gantry Leveling (if needed) and Bed Mesh Calibration
+gcode:
+    SAVE_GCODE_STATE NAME=STATE_G29
+
+    STATUS_HOMING
+    {% if "xyz" not in printer.toolhead.homed_axes %}
+        G28
+    {% elif 'z' not in printer.toolhead.homed_axes %}
+        G28 Z
+    {% endif %}
+
+    {% if not printer.quad_gantry_level.applied %}
+        QUAD_GANTRY_LEVEL
+    {% endif %}
+
+    STATUS_MESHING
+    BED_MESH_CALIBRATE Method=rapid_scan ADAPTIVE=1
+
+    STATUS_HOMING
+    G28 Z
+
+    RESTORE_GCODE_STATE NAME=STATE_G29
+    STATUS_READY
+
+# ============================================================
+# FILAMENT
+# ============================================================
+
+[gcode_macro LOAD_FILAMENT]
+variable_load_distance = 50
+variable_purge_distance = 25
+gcode:
+    {% set speed = params.SPEED|default(300) %}
+    {% set max_velocity = printer.configfile.settings['extruder'].max_extrude_only_velocity * 60 %}
+    SAVE_GCODE_STATE NAME=load_state
+    G91
+    G92 E0
+    G1 E{load_distance} F{max_velocity}
+    G1 E{purge_distance} F{speed}
+    RESTORE_GCODE_STATE NAME=load_state
+
+[gcode_macro UNLOAD_FILAMENT]
+variable_unload_distance = 75
+variable_purge_distance = 25
+gcode:
+    {% set speed = params.SPEED|default(300) %}
+    {% set max_velocity = printer.configfile.settings['extruder'].max_extrude_only_velocity * 60 %}
+    SAVE_GCODE_STATE NAME=unload_state
+    G91
+    G92 E0
+    G1 E{purge_distance} F{speed}
+    G1 E-{unload_distance} F{max_velocity}
+    RESTORE_GCODE_STATE NAME=unload_state
+
+# ============================================================
+# CALIBRATION
+# ============================================================
+
+[gcode_macro PROBE_CALIBRATE]
+description: Calibrates Z-offset with QGL (if needed), heated nozzle and bed
+rename_existing: PROBE_CALIBRATE_BASE
+gcode:
+    {% set BED_TEMP = params.BED_TEMP|default(60)|int %}
+
+    SAVE_GCODE_STATE NAME=STATE_PROBE_CALIBRATE
+
+    STATUS_HOMING
+    {% if "xyz" not in printer.toolhead.homed_axes %}
+        G28
+    {% elif 'z' not in printer.toolhead.homed_axes %}
+        G28 Z
+    {% endif %}
+
+    {action_respond_info("Starting preparation for Z-offset calibration")}
+    {action_respond_info("Heating hotend to 150C and bed to %d" % (BED_TEMP))}
+
+    M104 S150
+    M140 S{BED_TEMP}
+
+    {% if ('z_tilt' in printer and not printer.z_tilt.applied) or ('quad_gantry_level' in printer and not printer.quad_gantry_level.applied) %}
+        STATUS_LEVELING
+        {% if 'z_tilt' in printer and not printer.z_tilt.applied %}
+            {action_respond_info("Performing Z-tilt adjustment...")}
+            Z_TILT_ADJUST
+            STATUS_HOMING
+            G28 Z
+        {% endif %}
+        {% if 'quad_gantry_level' in printer and not printer.quad_gantry_level.applied %}
+            {action_respond_info("Performing Quad Gantry Level...")}
+            QUAD_GANTRY_LEVEL
+        {% endif %}
+    {% else %}
+        STATUS_HOMING
+        G28 Z
+    {% endif %}
+
+    M190 S{BED_TEMP}
+    M109 S150
+
+    PROBE_CALIBRATE_BASE
+    TESTZ Z=-4
+
+    RESTORE_GCODE_STATE NAME=STATE_PROBE_CALIBRATE
+    STATUS_READY
+
+[gcode_macro SHAPER_CALIBRATE]
+rename_existing: BASE_SHAPER_CALIBRATE
+description: Input Shaper auto-calibration with auto-centering
+gcode:
+    STATUS_HOMING
+    {% if "xyz" not in printer.toolhead.homed_axes %}
+        G28
+    {% elif 'z' not in printer.toolhead.homed_axes %}
+        G28 Z
+    {% endif %}
+
+    {% if ('z_tilt' in printer and not printer.z_tilt.applied) or ('quad_gantry_level' in printer and not printer.quad_gantry_level.applied) %}
+        STATUS_LEVELING
+        {% if 'z_tilt' in printer and not printer.z_tilt.applied %}
+            {action_respond_info("Performing Z-tilt adjustment...")}
+            Z_TILT_ADJUST
+            STATUS_HOMING
+            G28 Z
+        {% endif %}
+        {% if 'quad_gantry_level' in printer and not printer.quad_gantry_level.applied %}
+            {action_respond_info("Performing Quad Gantry Level...")}
+            QUAD_GANTRY_LEVEL
+        {% endif %}
+    {% else %}
+        STATUS_HOMING
+        G28 Z
+    {% endif %}
+
+    {% set x_size = printer.configfile.config.stepper_x.position_max|float %}
+    {% set y_size = printer.configfile.config.stepper_y.position_max|float %}
+
+    {% if 'bltouch' in printer.configfile.config %}
+        {% set probe_x_offset = printer.configfile.config.bltouch.x_offset|float %}
+        {% set probe_y_offset = printer.configfile.config.bltouch.y_offset|float %}
+    {% elif 'probe' in printer.configfile.config %}
+        {% set probe_x_offset = printer.configfile.config.probe.x_offset|float %}
+        {% set probe_y_offset = printer.configfile.config.probe.y_offset|float %}
+    {% elif 'probe_eddy_ng' in printer.configfile.config %}
+        {% set probe_x_offset = printer.configfile.config['probe_eddy_ng btt_eddy'].x_offset|float %}
+        {% set probe_y_offset = printer.configfile.config['probe_eddy_ng btt_eddy'].y_offset|float %}
+    {% else %}
+        {% set probe_x_offset = 0 %}
+        {% set probe_y_offset = 0 %}
+    {% endif %}
+
+    {% set center_x = (x_size / 2) - probe_x_offset %}
+    {% set center_y = (y_size / 2) - probe_y_offset %}
+
+    G90
+    G1 X{center_x} Y{center_y} Z30 F3000
+
+    BASE_SHAPER_CALIBRATE AXIS=x
+    BASE_SHAPER_CALIBRATE AXIS=y
+
+# ============================================================
+# EDDY HELPERS
+# ============================================================
+
+[gcode_macro PREP_EDDY]
+description: Heat bed/nozzle, home X/Y, center X/Y for Eddy testing
+gcode:
+    M140 S70
+    M104 S100
+    G28 X0 Y0
+    CENTER
+
+[gcode_macro PREP_EDDY_WAIT]
+description: Heat bed/nozzle (wait), home X/Y, center X/Y for Eddy testing
+gcode:
+    M109 S100
+    M190 S70
+    G28 X0 Y0
+    CENTER
+
+# ============================================================
+# NOZZLE CLEANING
+# ============================================================
+
+[gcode_macro CLEAN_NOZZLE]
+description: Clean nozzle using configurable temperature and wipe patterns
+gcode:
+    SAVE_GCODE_STATE NAME=CLEAN_NOZZLE_STATE
+
+    {% set NOZZLE_TEMP = params.EXTRUDER|default(params.TEMP|default(200))|int %}
+    {% set wipes = params.WIPES|default(5)|int %}
+
+    STATUS_HOMING
+    {% if "xyz" not in printer.toolhead.homed_axes %}
+        G28
+    {% elif 'z' not in printer.toolhead.homed_axes %}
+        G28 Z
+    {% endif %}
+
+    {% if ('z_tilt' in printer and not printer.z_tilt.applied) or ('quad_gantry_level' in printer and not printer.quad_gantry_level.applied) %}
+        STATUS_LEVELING
+        {% if 'z_tilt' in printer and not printer.z_tilt.applied %}
+            {action_respond_info("Performing Z-tilt adjustment...")}
+            Z_TILT_ADJUST
+            STATUS_HOMING
+            G28 Z
+        {% endif %}
+        {% if 'quad_gantry_level' in printer and not printer.quad_gantry_level.applied %}
+            {action_respond_info("Performing Quad Gantry Level...")}
+            QUAD_GANTRY_LEVEL
+        {% endif %}
+    {% else %}
+        STATUS_HOMING
+        G28 Z
+    {% endif %}
+
+    G90
+    G1 X322 Y359 Z10 F7800      # Move to brush center with safe Z
+
+    STATUS_HEATING
+    M117 Heating nozzle...
+    {action_respond_info("Heating nozzle to %s°C" % (NOZZLE_TEMP))}
+    M109 S{NOZZLE_TEMP}
+
+    G91
+    G90
+    M106 S127
+
+    STATUS_CLEANING
+    M117 Cleaning nozzle
+
+    G1 X305 Y359 F7800          # Move to left edge of brush
+    G1 Z1.75 F300                  # Lower to cleaning height
+
+    {% for wipe in range(wipes) %}
+        G1 X337 Y359 F7800      # Wipe right
+        G1 X305 Y359 F7800      # Wipe left
+
+        G1 Y363 X314 F7800      # Diagonal to top, 1/3 from left
+        G1 Y359 X322 F7800      # Back to center
+        G1 Y356 X337 F7800      # Diagonal to bottom right
+
+        G1 Y363 X305 F7800      # Top left
+        G1 Y356 X322 F7800      # Bottom center
+    {% endfor %}
+
+    G1 Y363 X305 F7800          # Move to back corner away from brush
+    M400
+    M117 Clean Complete
+    M107
+
+    G91
+    G1 Z10 F300
+    G90
+    G28 Z
+
+    STATUS_READY
+    {% if printer.idle_timeout.state == "Idle" %}
+        TURN_OFF_HEATERS
+        {action_respond_info("Cleaning complete - heaters turned off (idle state)")}
+    {% else %}
+        {action_respond_info("Cleaning complete - heaters maintained (printing state)")}
+    {% endif %}
+
+    RESTORE_GCODE_STATE NAME=CLEAN_NOZZLE_STATE
+
+# ============================================================
+# PRINT START / END
+# ============================================================
+
+[gcode_macro START_PRINT]
+gcode:
+    {% set target_bed = params.BED|int %}
+    {% set target_extruder = params.EXTRUDER|int %}
+    {% set target_chamber = params.CHAMBER|default("40")|int %}
+    {% set x_wait = printer.toolhead.axis_maximum.x|float / 2 %}
+    {% set y_wait = printer.toolhead.axis_maximum.y|float / 2 %}
+
+    M104 S160
+    M190 S{target_bed}
+
+    STATUS_HOMING
+    {% if "xyz" not in printer.toolhead.homed_axes %}
+        G28
+    {% elif 'z' not in printer.toolhead.homed_axes %}
+        G28 Z
+    {% endif %}
+
+    G90
+    M400
+    CLEAR_PAUSE
+    BED_MESH_CLEAR
+
+    {% set raw_material = params.MATERIAL|default("PLA")|string|upper %}
+
+    {% if printer.configfile.config['gcode_macro GANTRY_LEVELING'] is defined %}
+        M117 Gantry Leveling...
+        GANTRY_LEVELING
+    {% else %}
+        {% if 'z_tilt' in printer %}
+            M117 Z-tilt...
+            Z_TILT_ADJUST
+        {% elif 'quad_gantry_level' in printer %}
+            M117 QGL...
+            QGLx3
+        {% endif %}
+    {% endif %}
+
+    {% if 'z' not in printer.toolhead.homed_axes %}
+        M117 Z homing
+        G28 Z
+    {% endif %}
+
+    STATUS_HEATING
+    CLEAN_NOZZLE EXTRUDER=160
+
+    STATUS_COOLING
+
+    STATUS_CALIBRATING_Z
+    M117 Tappy Tap
+    PROBE_EDDY_NG_TAP
+
+    SMART_PARK
+
+    STATUS_MESHING
+    M117 Bed mesh
+    BED_MESH_CALIBRATE ADAPTIVE=1 METHOD=RAPID_SCAN
+
+    M400
+
+    STATUS_CLEANING
+    SMART_PARK
+
+    M117 Hotend: {target_extruder}C
+    STATUS_HEATING
+    M107
+    M109 S{target_extruder}
+
+    M117 The purge...
+    STATUS_CLEANING
+    LINE_PURGE
+
+    M117 Printer goes brrr
+    STATUS_PRINTING
+
+[gcode_macro END_PRINT]
+gcode:
+    {% set max_x = printer.configfile.config["stepper_x"]["position_max"]|float %}
+    {% set max_y = printer.configfile.config["stepper_y"]["position_max"]|float %}
+    {% set max_z = printer.configfile.config["stepper_z"]["position_max"]|float %}
+    {% set min_x = printer.configfile.config["stepper_x"]["position_endstop"]|float %}
+
+    {% if printer.toolhead.position.x < (max_x - 20) %}
+        {% set x_safe = 20.0 %}
+    {% else %}
+        {% set x_safe = -20.0 %}
+    {% endif %}
+
+    {% if printer.toolhead.position.y < (max_y - 20) %}
+        {% set y_safe = 20.0 %}
+    {% else %}
+        {% set y_safe = -20.0 %}
+    {% endif %}
+
+    {% if printer.toolhead.position.z < (max_z - 2) %}
+        {% set z_safe = 2.0 %}
+    {% else %}
+        {% set z_safe = max_z - printer.toolhead.position.z %}
+    {% endif %}
+
+    M400
+    G92 E0
+    G1 E-4.0 F3600
+    G91
+    G0 Z{z_safe} F3600
+    M104 S170
+    M106 S0
+    M107
+    G90
+    G1 X{min_x - 20} Y{max_y - 20} F2000
+    _CLIENT_LINEAR_MOVE Z=50 F=1500
+    PROBE_EDDY_NG_SET_TAP_OFFSET VALUE=0
+    BED_MESH_CLEAR
+    SET_VELOCITY_LIMIT ACCEL=21000
+    SET_GCODE_OFFSET Z=0 MOVE=1
+    SET_PRESSURE_ADVANCE EXTRUDER=extruder ADVANCE=0.025
+
+    {% if printer.toolhead.position.z > (max_z - 20) %}
+        G91
+        G1 Z-10 F600
+        G90
+    {% endif %}
+
+    {% if 'nevermore' in printer.configfile.settings %}
+        SET_PIN PIN=nevermore VALUE=1
+        UPDATE_DELAYED_GCODE ID=check_nevermore_status DURATION=300
+    {% endif %}
+
+    M117 Print finished!!
+    UPDATE_DELAYED_GCODE ID=set_ready_status DURATION=60
