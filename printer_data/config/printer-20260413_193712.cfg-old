@@ -1,0 +1,650 @@
+[include mainsail.cfg]
+[include timelapse.cfg]
+#[include get_ip.cfg]
+#[include plr.cfg]
+[include macros.cfg]
+[include moonraker_obico_macros.cfg]
+[include KAMP_Settings.cfg]
+[include eddy-ng.cfg]
+[include shakentune.cfg]
+[include LEDs.cfg]
+[include speed_macros.cfg]
+[include bed_dryer.cfg]
+[include heat_soak.cfg]
+
+
+[auto_speed]
+axis: diag_x, diag_y
+settling_home: 1
+margin: 20
+endstop_samples: 3
+accel_min: 20000
+accel_max: 150000
+velocity_min: 600
+velocity_max: 2000
+derate: 0.8
+results_dir: /home/biqu/printer_data/config/auto_speed_results
+
+[multi_pin fan]
+pins: extra_mcu:PA7, extra_mcu:PB0,
+
+[force_move]
+enable_force_move: true
+
+[mcu]      
+serial: /dev/serial/by-id/usb-Klipper_stm32f103xe_36FFDE05334D413222501451-if00
+restart_method: command     
+
+[mcu extra_mcu]
+serial: /dev/serial/by-id/usb-Klipper_stm32f103xe_57FF6B064888875425291667-if00
+restart_method: command     
+
+
+[adxl345]
+cs_pin:extra_mcu:PB12
+axes_map: x,z,y 
+
+[exclude_object]
+
+[firmware_retraction]
+retract_length: 0.85
+#   The length of filament (in mm) to retract when G10 is activated,
+#   and to unretract when G11 is activated (but see
+#   unretract_extra_length below). The default is 0 mm.
+retract_speed: 35
+#   The speed of retraction, in mm/s. The default is 20 mm/s.
+#unretract_extra_length: 0
+#   The length (in mm) of *additional* filament to add when
+#   unretracting.
+unretract_speed: 25
+#   The speed of unretraction, in mm/s. The default is 10 mm/s.
+
+[resonance_tester]
+accel_chip: adxl345
+probe_points:
+    175, 175, 30  # an example175 Y175 Z30
+#accel_per_hz:50
+min_freq:20
+max_freq:110
+#max_smoothing:0.2
+#hz_per_sec:0.5
+
+[temperature_sensor mcu_temp]         
+sensor_type: temperature_mcu
+min_temp:0
+max_temp:100
+
+[temperature_sensor Host_temp]     
+sensor_type: temperature_host
+min_temp: 0
+max_temp: 110
+
+[temperature_sensor Toolhead_Temp]
+sensor_type: temperature_mcu
+sensor_mcu: extra_mcu
+
+[virtual_sdcard] 
+path:/home/biqu/printer_data/gcodes/
+
+[pause_resume]
+
+[printer]
+kinematics: corexy           
+max_velocity: 700            
+max_accel: 21000             
+#max_accel_to_decel: 10000     
+max_z_velocity: 20           
+max_z_accel: 500            
+square_corner_velocity: 15  
+
+[input_shaper]
+damping_ratio_x: 0.037
+damping_ratio_y: 0.043
+shaper_type_x: ei
+shaper_freq_x: 72.6
+shaper_type_y: ei
+shaper_freq_y: 53.8
+
+#[probe]
+#pin: extra_mcu:PB6    
+#x_offset: -17                  
+#y_offset: 10             
+##z_offset : 1
+#speed: 15.0
+#speed: 5.0
+#samples: 3 #2
+#sample_retract_dist: 5.0 #2.0
+#lift_speed: 50
+#samples_result: average
+#samples_tolerance: 0.0075  #0.016
+#samples_tolerance_retries: 10 #2
+
+
+#[probe_pressure]
+#pin: ^!PE12     
+#x_offset: 0                  
+#y_offset: 0
+#z_offset : 0
+#speed: 1.0
+
+[homing_override]
+gcode:
+   {% if not 'Z' in params and not 'Y' in params and 'X' in params %}
+     G28 X
+     G0 X348 F1200
+   {% elif not 'Z' in params and not 'X' in params and 'Y' in params %}
+     G28 Y
+     G0 Y360  F1200
+   {% elif not 'Z' in params and 'X' in params and 'Y' in params %}
+     G28 Y
+     G0 Y360  F1200
+     G4 P2000
+     G28 X
+     G0 X348  F1200
+   {% elif 'Z' in params and not 'X' in params and not 'Y' in params %}
+     G90
+     G0  X191 Y165 F3600
+     G28 Z
+     G0  Z10 F600
+   {% else %}
+     G90
+     G0 Z5 F300
+     G28 Y
+     G0 Y360  F1200
+     G4 P2000
+     G28 X
+     G0 X348  F1200
+     G90
+     G0  X191 Y165 F3600
+     G28 Z
+     G0  Z10 F600
+   {% endif %}
+axes: xyz
+set_position_z: 0
+
+[bed_mesh]
+horizontal_move_z: 2
+zero_reference_position: 175, 175
+speed: 400
+# mesh min x,y = bed_min_x + max(15, min(x_offs, 0)) , bed_min_y + max(15, min(y_offs, 0))
+# mesh max x,y = bed_max_x - max(15, abs(x_offs)) , bed_max_y - max(15, abs(y_offs)) - fudge for scan overshoot
+##mesh_min: 15, 15
+##mesh_max: 334, 333
+mesh_min: 18, 18
+mesh_max: 332, 290
+# extra x-axis movement to smooth out moves
+# scan_overshoot: 5
+probe_count: 25, 25 #15, 15
+algorithm: bicubic
+bicubic_tension: 0.5
+split_delta_z: 0.0125
+# interpolate 3 points per probed point
+mesh_pps: 3,3
+adaptive_margin: 5
+# layers to start fading out Z adjustment and to end it, with a target of 0
+fade_start: 1
+fade_end: 10
+fade_target: 0
+
+[quad_gantry_level]
+gantry_corners:
+	-60,-10
+	410,420
+points:
+	30,30
+	30,320
+	320,320
+	320,30
+#	36,10
+#	36,320
+#	346,320
+#	346,10
+speed: 400
+retry_tolerance: 0.075
+retries: 10
+max_adjust: 10
+#horizontal_move_z: 2.0
+horizontal_move_z: 8.0
+
+#[z_offset_calibration]
+#center_xy_position:191,165      
+#endstop_xy_position:289,361                         
+#z_hop: 10                       
+#z_hop_speed: 15                                  
+#--------------------STEPPER MOTORS------------------------    
+[stepper_x]
+step_pin: PE2
+dir_pin: !PE0
+enable_pin: !PE3
+rotation_distance: 40         
+microsteps: 64 #16                
+full_steps_per_rotation:200   
+endstop_pin: tmc2209_stepper_x: virtual_endstop              
+position_min: 0               
+position_endstop: 355         
+position_max: 355             
+homing_speed: 45              
+homing_retract_dist: 0        
+homing_positive_dir: True     
+#--------------------------------------------------------------------
+[tmc2209 stepper_x]
+uart_pin: PE1
+##interpolate: False #True  
+interpolate: true #delete this after
+run_current: 1.2 #1.5
+#hold_current: 1.061 #1.5            
+sense_resistor: 0.150         
+#stealthchop_threshold: 0      
+uart_address:3
+##driver_sgthrs: 75 #65
+diag_pin: PE15
+##driver_TBL: 1
+##driver_TOFF: 3
+##driver_HSTRT: 7
+##driver_HEND: 5
+
+[stepper_y]
+step_pin: PB8
+dir_pin: !PB6
+enable_pin: !PB9
+rotation_distance: 40         
+microsteps: 64 #16                
+full_steps_per_rotation:200   
+endstop_pin: tmc2209_stepper_y: virtual_endstop              
+position_min: 0               
+position_endstop: 364         
+position_max: 364            
+homing_speed: 45              
+homing_retract_dist: 0        
+homing_positive_dir: true     
+#--------------------------------------------------------------------
+[tmc2209 stepper_y]
+uart_pin: PB7
+##interpolate: False #True
+interpolate: true #delete this after
+run_current: 1.2 #1.5
+#hold_current: 1.061 #1.5             
+sense_resistor: 0.150         
+#stealthchop_threshold: 0      
+uart_address:3
+##driver_sgthrs: 85 #75 #65
+diag_pin: PE13
+##driver_TBL: 1
+##driver_TOFF: 3
+##driver_HSTRT: 7
+##driver_HEND: 5
+
+[stepper_z] #motherboard：Z3 
+step_pin:PC0    
+dir_pin:PE5    
+enable_pin:!PC1    
+rotation_distance: 40         
+gear_ratio: 80:12             
+microsteps: 64 #16
+endstop_pin: probe:z_virtual_endstop           
+position_max: 347             
+position_min: -5              
+#position_endstop: 0
+homing_speed: 15.0
+homing_retract_dist: 5.0
+homing_retract_speed: 15.0
+second_homing_speed: 10.0
+#--------------------------------------------------------------------
+[tmc2209 stepper_z]
+uart_pin: PE6 
+##interpolate: false #true     
+interpolate: false #delete this after
+run_current: 0.5 #0.58          
+#hold_current: 0.566 #0.58         
+sense_resistor: 0.150       
+stealthchop_threshold: 999999 
+uart_address:3
+#driver_TBL: 1
+#driver_TOFF: 3
+#driver_HSTRT: 0
+#driver_HEND: 2
+[stepper_z1] ##motherboard：Z1
+step_pin:PD3  
+dir_pin:!PD1 
+enable_pin:!PD4 
+rotation_distance: 40         
+gear_ratio: 80:12            
+microsteps: 64 #16        
+#--------------------------------------------------------------------
+[tmc2209 stepper_z1]
+uart_pin:PD2  
+interpolate: false #delete this after
+##interpolate: false #true             
+run_current: 0.5 #0.58          
+#hold_current: 0.566 #0.58         
+sense_resistor: 0.150  
+stealthchop_threshold: 999999 
+uart_address:3
+#driver_TBL: 1
+#driver_TOFF: 3
+#driver_HSTRT: 0
+#driver_HEND: 2
+[stepper_z2] ##motherboard：Z2
+step_pin:PD7
+dir_pin:PD5   
+enable_pin:!PB5
+rotation_distance: 40         
+gear_ratio: 80:12             
+microsteps: 64 #16          
+#--------------------------------------------------------------------
+[tmc2209 stepper_z2]
+uart_pin:PD6  
+interpolate: false #delete this after
+##interpolate: false #true             
+run_current: 0.5 #0.58          
+#hold_current: 0.566 #0.58         
+sense_resistor: 0.150   
+stealthchop_threshold: 999999 
+uart_address:3
+#driver_TBL: 1
+#driver_TOFF: 3
+#driver_HSTRT: 0
+#driver_HEND: 2
+[stepper_z3] ##motherboard：Z4
+step_pin:PD11 
+dir_pin:!PD9 
+enable_pin:!PD12   
+rotation_distance: 40         
+gear_ratio: 80:12             
+microsteps: 64 #16       
+#--------------------------------------------------------------------
+[tmc2209 stepper_z3]
+uart_pin:PD10    
+interpolate: false #delete this after
+##interpolate: false #true             
+run_current: 0.5 #0.58          
+#hold_current: 0.566 #0.58         
+sense_resistor: 0.150
+stealthchop_threshold: 999999 
+uart_address:3
+#driver_TBL: 1
+#driver_TOFF: 3
+#driver_HSTRT: 0
+#driver_HEND: 2
+
+[extruder]
+step_pin: extra_mcu:PA8   
+dir_pin: extra_mcu:PB8    
+enable_pin:!extra_mcu: PB11   
+rotation_distance: 6.60324
+microsteps: 64                
+full_steps_per_rotation: 200 
+nozzle_diameter: 0.400        
+filament_diameter: 1.75  
+max_extrude_only_distance: 150     
+heater_pin:extra_mcu:PB9  
+sensor_type:my_thermistor_e  
+pullup_resistor: 11500
+sensor_pin: extra_mcu:PA5  
+min_temp: 5                  
+max_temp: 305                 
+max_power: 1.0
+min_extrude_temp: 5
+#control : pid
+#pid_kp : 33.838
+#pid_ki : 5.223
+#pid_kd : 47.752
+pressure_advance: 0.025       
+pressure_advance_smooth_time: 0.035   
+max_extrude_cross_section: 5
+#--------------------------------------------------------------------
+[tmc2209 extruder]
+uart_pin: extra_mcu:PB10  
+interpolate: false
+##interpolate: False #True             
+run_current: 0.8
+#hold_current: #0.8            
+uart_address:3
+sense_resistor: 0.150
+driver_TBL: 1
+driver_TOFF: 3
+driver_HSTRT: 7
+driver_HEND: 8
+
+#-------------------------------------------------------------------
+
+[autotune_tmc stepper_x]
+motor: shengyang-42bygh2904-a-24nq1
+sg4_thrs: 75
+tuning_goal: performance
+tbl: 1
+toff: 3
+[autotune_tmc stepper_y]
+motor: shengyang-42bygh2904-a-24nq1
+sg4_thrs: 90
+tuning_goal: performance
+tbl: 1
+toff: 3
+
+#[autotune_tmc stepper_z]
+#motor: Shengyang-42BYGH1603-A-20DNT
+#[autotune_tmc stepper_z1]
+#motor: Shengyang-42BYGH1603-A-20DNT
+#[autotune_tmc stepper_z2]
+#motor: Shengyang-42BYGH1603-A-20DNT
+#[autotune_tmc stepper_z3]
+#motor: Shengyang-42BYGH1603-A-20DNT
+
+#[autotune_tmc extruder]
+#motor: Shengyang-36BYG1510-1M-6QT
+
+#----------------------------------------------------------------
+
+[verify_heater extruder]      
+max_error: 120                
+check_gain_time:30           
+hysteresis: 5                
+heating_gain: 2               
+
+[filament_switch_sensor external_filament_sensor]
+pause_on_runout: True
+event_delay: 3.0
+pause_delay: 0.5
+switch_pin: PE9
+
+#[filament_switch_sensor extruder_entry]
+#switch_pin: ^!extra_mcu:PB6
+#pause_on_runout: False
+#event_delay: 3.0
+#pause_delay: 0.5
+
+
+[thermistor my_thermistor]
+temperature1:25
+resistance1:100000
+temperature2:50
+resistance2:18085.4
+temperature3:100
+resistance3:5362.6
+
+[thermistor my_thermistor_e]
+temperature1:25
+resistance1:110000
+temperature2:100
+resistance2:7008
+temperature3:220
+resistance3:435
+
+[heater_bed]
+heater_pin:PA0
+sensor_type: my_thermistor  
+sensor_pin: PC5
+max_power: 1.0               
+min_temp: 5                  
+max_temp: 105                
+#control : pid
+#pid_kp : 73.571
+#pid_ki : 1.820
+#pid_kd : 783.849
+
+[verify_heater heater_bed]      
+max_error: 120                
+check_gain_time:40           
+hysteresis: 5                
+heating_gain: 2 
+
+
+[fan_generic fan0] # back model cooling fan
+pin: extra_mcu:PA7
+max_power: 1.0
+
+[fan_generic fan1] # front model cooling fan
+pin: extra_mcu:PB0
+max_power: 1.0
+
+[controller_fan MCU_fan]
+pin: PA1
+max_power: 1
+kick_start_time: 0.5
+fan_speed: 1
+idle_timeout: 1800
+heater: extruder, heater_bed
+stepper: stepper_x, stepper_y
+
+[heater_fan hotend_fan]      
+pin: extra_mcu:PB1   
+max_power: 1.0               
+kick_start_time: 0.5         
+heater: extruder             
+heater_temp: 50              
+tachometer_pin:extra_mcu:PA4
+tachometer_ppr: 1
+tachometer_poll_interval: 0.0013
+
+[fan_generic fan_2] # temp controlled exhaust fan
+pin: PA2
+kick_start_time: 0.5
+max_power: 1.0
+#min_temp: 0
+#max_temp: 90
+#hardware_pwm: true
+#target_temp: 57
+#sensor_type: temperature_host
+#max_speed: 1.0
+#min_speed: 0.23
+#off_below: 0.25
+#control: pid
+#pid_Kp: 2
+#pid_Ki: .5
+#pid_Kd: 0.25
+#pid_deriv_time: 5.0
+
+[board_pins]
+aliases:
+    # EXP1 header
+    EXP1_1=PA8,   EXP1_2=PC9,
+    EXP1_3=PA10,  EXP1_4=PA9,
+    EXP1_5=PC11,  EXP1_6=PC10,
+    EXP1_7=PD8,   EXP1_8=PC12,
+    EXP1_9=<GND>, EXP1_10=<5V>,
+
+    # EXP2 header
+    EXP2_1=PB14,  EXP2_2=PB13,
+    EXP2_3=PC7,   EXP2_4=PB12,
+    EXP2_5=PC6,   EXP2_6=PB15,
+    EXP2_7=PC8,   EXP2_8=<RST>,
+    EXP2_9=<GND>, EXP2_10=<5V>
+
+[display]                    
+lcd_type: uc1701
+cs_pin: EXP1_3
+a0_pin: EXP1_4
+rst_pin: EXP1_5
+encoder_pins: ^EXP2_5, ^EXP2_3
+click_pin: ^!EXP1_2
+contrast: 63
+spi_software_miso_pin: EXP2_1
+spi_software_mosi_pin: EXP2_6
+spi_software_sclk_pin: EXP2_2
+
+[output_pin beeper]
+pin: EXP1_1
+pwm: False
+value: 0
+       
+
+
+[gcode_arcs]                       
+resolution: 1.0                    
+
+[output_pin main_led]
+pin:PA3
+pwm: 1
+value:1
+cycle_time: 0.010
+
+[idle_timeout]
+gcode: _IDLE_TIMEOUT
+timeout: 1800
+
+[delayed_gcode set_ready_status]
+gcode:
+  STATUS_READY                                       # # Sets SB-LEDs to ready-mode
+
+[save_variables]
+filename =/home/biqu/printer_data/config/saved_variables.cfg
+
+#*# <---------------------- SAVE_CONFIG ---------------------->
+#*# DO NOT EDIT THIS BLOCK OR BELOW. The contents are auto-generated.
+#*#
+#*# [heater_bed]
+#*# control = pid
+#*# pid_kp = 71.556
+#*# pid_ki = 1.375
+#*# pid_kd = 931.118
+#*#
+#*# [bed_mesh default]
+#*# version = 1
+#*# points =
+#*# 	0.112941, 0.102165, 0.089832, 0.069418, 0.067814, 0.067814, 0.067814, 0.055110, 0.042595, 0.031821, 0.031821, 0.030269, 0.030269, 0.024110, 0.022604, 0.022604, 0.022604, 0.022604, 0.025662, 0.038762, 0.061462, 0.085223, 0.109893, 0.136110, 0.160030
+#*# 	0.102165, 0.085223, 0.074936, 0.072562, 0.078914, 0.078914, 0.074166, 0.059086, 0.042595, 0.030269, 0.025662, 0.020276, 0.014889, 0.010217, 0.010217, 0.014889, 0.019499, 0.014889, 0.013318, 0.033377, 0.055910, 0.074166, 0.083662, 0.102165, 0.137679
+#*# 	0.112941, 0.107555, 0.103727, 0.102165, 0.106774, 0.106774, 0.103727, 0.092951, 0.072562, 0.050360, 0.044147, 0.042595, 0.025662, 0.021052, 0.019499, 0.024110, 0.023357, 0.022604, 0.022604, 0.034153, 0.053506, 0.070958, 0.077310, 0.093696, 0.103727
+#*# 	0.127653, 0.125303, 0.117550, 0.116064, 0.116064, 0.114502, 0.112941, 0.099863, 0.072562, 0.059858, 0.048758, 0.043371, 0.031821, 0.021052, 0.021052, 0.022604, 0.024886, 0.019499, 0.019499, 0.031821, 0.048758, 0.056710, 0.059858, 0.072562, 0.089832
+#*# 	0.143868, 0.144652, 0.142302, 0.136110, 0.132273, 0.126870, 0.118331, 0.095999, 0.083662, 0.066210, 0.055910, 0.044925, 0.033377, 0.020276, 0.016441, 0.019499, 0.019499, 0.014889, 0.008644, 0.022604, 0.037984, 0.042595, 0.044147, 0.048758, 0.063066
+#*# 	0.169818, 0.164215, 0.152243, 0.140775, 0.136110, 0.131490, 0.116064, 0.097560, 0.078914, 0.061462, 0.055110, 0.045703, 0.030269, 0.019499, 0.014889, 0.014889, 0.014889, 0.016441, 0.011767, 0.021052, 0.031821, 0.037984, 0.041843, 0.042595, 0.061462
+#*# 	0.175425, 0.173333, 0.164215, 0.146922, 0.136110, 0.136110, 0.129180, 0.108336, 0.091389, 0.077310, 0.066210, 0.050358, 0.030269, 0.021828, 0.014889, 0.013318, 0.013318, 0.011791, 0.006307, 0.010217, 0.031821, 0.033377, 0.037984, 0.042595, 0.055110
+#*# 	0.169818, 0.164215, 0.148489, 0.136110, 0.119112, 0.115283, 0.112941, 0.090611, 0.071760, 0.055910, 0.045703, 0.036432, 0.021052, 0.008644, -0.000705, -0.002278, -0.003063, -0.005400, -0.010095, -0.003847, 0.008644, 0.021052, 0.025662, 0.028767, 0.047231
+#*# 	0.165637, 0.155846, 0.142302, 0.123774, 0.116064, 0.114502, 0.106774, 0.089832, 0.066210, 0.055910, 0.044147, 0.028767, 0.013318, 0.006307, -0.003847, -0.006952, -0.010095, -0.027653, -0.027653, -0.015554, 0.002396, 0.013318, 0.014103, 0.030294, 0.038762
+#*# 	0.148489, 0.143868, 0.126870, 0.112941, 0.105251, 0.102165, 0.091389, 0.074166, 0.058314, 0.037984, 0.031821, 0.025662, 0.011791, -0.002278, -0.014769, -0.016338, -0.019447, -0.032578, -0.033404, -0.027653, -0.008521, 0.002396, 0.003970, 0.019499, 0.028767
+#*# 	0.133800, 0.119112, 0.107555, 0.096779, 0.089087, 0.085223, 0.078914, 0.061462, 0.038762, 0.030269, 0.025662, 0.014889, -0.003847, -0.009308, -0.021082, -0.026002, -0.030926, -0.038326, -0.044074, -0.034230, -0.017874, -0.013200, -0.010095, 0.005543, 0.025662
+#*# 	0.108336, 0.099084, 0.078914, 0.067814, 0.066210, 0.064638, 0.061462, 0.048758, 0.037984, 0.021052, 0.017970, 0.013318, -0.006952, -0.014769, -0.023542, -0.027653, -0.034230, -0.044074, -0.052298, -0.051474, -0.027653, -0.016338, -0.014769, -0.000726, 0.024110
+#*# 	0.106774, 0.089832, 0.066210, 0.053506, 0.048758, 0.050358, 0.050358, 0.037208, 0.025662, 0.021052, 0.014889, 0.013318, 0.000059, -0.008521, -0.024350, -0.032578, -0.037502, -0.049012, -0.052298, -0.039150, -0.024350, -0.016338, -0.010095, 0.010217, 0.027214
+#*# 	0.102165, 0.079716, 0.055110, 0.031821, 0.031821, 0.031821, 0.031821, 0.027214, 0.014889, 0.002396, 0.002396, 0.000827, -0.014769, -0.024350, -0.030116, -0.039150, -0.045726, -0.068884, -0.065940, -0.057079, -0.035850, -0.027653, -0.021082, -0.001491, 0.024110
+#*# 	0.107555, 0.089832, 0.069418, 0.056710, 0.045703, 0.044147, 0.042595, 0.030294, 0.017970, 0.008644, 0.007070, 0.003970, -0.014769, -0.021082, -0.034230, -0.037502, -0.039976, -0.050648, -0.058583, -0.052298, -0.034230, -0.026002, -0.018660, 0.002396, 0.022604
+#*# 	0.136110, 0.112941, 0.089832, 0.078914, 0.061462, 0.059858, 0.055910, 0.042595, 0.025662, 0.014889, 0.009430, 0.007070, -0.006952, -0.024350, -0.027653, -0.032578, -0.040801, -0.052298, -0.055575, -0.047362, -0.025176, -0.014769, -0.010095, 0.003970, 0.031821
+#*# 	0.143085, 0.130707, 0.112941, 0.102165, 0.083662, 0.078914, 0.070188, 0.055110, 0.039540, 0.024110, 0.021052, 0.011767, -0.006952, -0.017874, -0.026002, -0.027653, -0.035866, -0.039150, -0.048998, -0.034230, -0.013984, -0.003847, 0.008644, 0.027214, 0.046452
+#*# 	0.155846, 0.138465, 0.120678, 0.103727, 0.089832, 0.086784, 0.074166, 0.059858, 0.039540, 0.021052, 0.014889, 0.008644, -0.002278, -0.017893, -0.026828, -0.032578, -0.034230, -0.039150, -0.045726, -0.033404, -0.014769, -0.002278, 0.008644, 0.022604, 0.042595
+#*# 	0.151532, 0.142302, 0.123736, 0.112941, 0.096779, 0.089832, 0.078914, 0.055110, 0.038762, 0.022604, 0.013318, 0.002396, -0.014769, -0.026828, -0.030926, -0.034230, -0.035040, -0.042438, -0.040801, -0.032578, -0.014769, -0.001491, 0.017194, 0.036432, 0.055110
+#*# 	0.142302, 0.129180, 0.108336, 0.095999, 0.083662, 0.078914, 0.066210, 0.048758, 0.024133, 0.007857, -0.000705, -0.008521, -0.027653, -0.038326, -0.045726, -0.048998, -0.045726, -0.050650, -0.051474, -0.044074, -0.027653, -0.010095, 0.005520, 0.020276, 0.044147
+#*# 	0.129923, 0.114502, 0.104507, 0.083662, 0.078914, 0.072562, 0.061462, 0.044149, 0.015665, 0.002396, -0.006952, -0.014769, -0.033404, -0.045726, -0.050650, -0.052298, -0.052298, -0.053936, -0.053936, -0.040801, -0.022734, -0.010095, 0.003183, 0.025662, 0.048758
+#*# 	0.120678, 0.107555, 0.090611, 0.078914, 0.066210, 0.060660, 0.053506, 0.031821, 0.013318, -0.010095, -0.019447, -0.024350, -0.039150, -0.054700, -0.060039, -0.060039, -0.060039, -0.062995, -0.062995, -0.048998, -0.027653, -0.006952, -0.000705, 0.025662, 0.042595
+#*# 	0.106774, 0.086004, 0.067012, 0.061462, 0.058314, 0.042595, 0.037984, 0.020276, 0.000061, -0.014769, -0.027653, -0.034230, -0.051474, -0.062995, -0.062995, -0.062995, -0.063733, -0.066670, -0.068884, -0.050650, -0.030116, -0.010095, -0.003847, 0.024110, 0.061462
+#*# 	0.097560, 0.070990, 0.046452, 0.033377, 0.021052, 0.019499, 0.013318, -0.000726, -0.021082, -0.037502, -0.039150, -0.047362, -0.062255, -0.073296, -0.074776, -0.079188, -0.080664, -0.085076, -0.085076, -0.074776, -0.051474, -0.031752, -0.013200, 0.021052, 0.063066
+#*# 	0.093694, 0.061462, 0.031821, 0.011791, -0.003847, -0.006952, -0.010095, -0.029290, -0.048998, -0.058583, -0.060777, -0.062255, -0.071090, -0.074776, -0.083600, -0.093356, -0.097188, -0.097188, -0.097188, -0.082132, -0.063733, -0.039976, -0.016338, 0.031821, 0.102165
+#*# x_count = 25
+#*# y_count = 25
+#*# mesh_x_pps = 3
+#*# mesh_y_pps = 3
+#*# algo = bicubic
+#*# tension = 0.5
+#*# min_x = 18.0
+#*# max_x = 331.92
+#*# min_y = 18.0
+#*# max_y = 331.92
+#*#
+#*# [extruder]
+#*# control = pid
+#*# pid_kp = 31.266
+#*# pid_ki = 3.594
+#*# pid_kd = 68.003
+#*#
+#*# [probe_eddy_ng btt_eddy]
+#*# calibrated_drive_currents = 16, 17
+#*# calibration_version = 5
+#*# calibration_16 = gASVywMAAAAAAAB9lCiMAXaUSwWMBGZ0b2iUjBtudW1weS5wb2x5bm9taWFsLnBvbHlub21pYWyUjApQb2x5bm9taWFslJOUKYGUfZQojARjb2VmlIwWbnVtcHkuX2NvcmUubXVsdGlhcnJheZSMDF9yZWNvbnN0cnVjdJSTlIwFbnVtcHmUjAduZGFycmF5lJOUSwCFlEMBYpSHlFKUKEsBSwqFlGgMjAVkdHlwZZSTlIwCZjiUiYiHlFKUKEsDjAE8lE5OTkr/////Sv////9LAHSUYolDUKffZtdcKPs/7YAeH9R0/T/1/UvatJbkPwv+8k7Tbds/5Z/+sOw60D89/WKLvMWuv3xpMCV1gHa/0wE72kSXzT/DBBi4SNCrP5v/HRHVRq+/lHSUYowGZG9tYWlulGgLaA5LAIWUaBCHlFKUKEsBSwKFlGgYiUMQjrqRUzjIlD4KBZWFXhKVPpR0lGKMBndpbmRvd5RoC2gOSwCFlGgQh5RSlChLAUsChZRoGIlDEAAAAAAAAPC/AAAAAAAA8D+UdJRijAdfc3ltYm9slIwBeJSMBnN5bWJvbJRoLHVijAlmdG9oX2hpZ2iUaAUpgZR9lChoCGgLaA5LAIWUaBCHlFKUKEsBSwqFlGgYiUNQJtJDIIetGkAh/kVvSegIQLFhcQ6+A/0/4TV1w0pTCUCpXSGX12qvvz3aSr71DyDA/zT0yFoVAUCzBUbD14cqQKxX8Eo+Jue/HVPlWKHkGMCUdJRiaB1oC2gOSwCFlGgQh5RSlChLAUsChZRoGIlDEMlwpCwQD5U+hfJQgncjlT6UdJRiaCRoC2gOSwCFlGgQh5RSlChLAUsChZRoGIlDEAAAAAAAAPC/AAAAAAAA8D+UdJRiaCtoLGgtaCx1YowEaHRvZpRoBSmBlH2UKGgIaAtoDksAhZRoEIeUUpQoSwFLCoWUaBiJQ1BOr4cm7PyUPhGxWJ0jWSA+D5pCkOUTEL5HQ6d8plD3PZQYDRh00sQ9spfAJBG67L1NftVsSA3RvbWs2q+zlfE9lVe0RwgZxj2GyB1dIUjivZR0lGJoHWgLaA5LAIWUaBCHlFKUKEsBSwKFlGgYiUMQYCbrlGGQ0D9mnp1Nh/sTQJR0lGJoJGgLaA5LAIWUaBCHlFKUKEsBSwKFlGgYiUMQAAAAAAAA8L8AAAAAAADwP5R0lGJoK2gsaC1oLHVijAdoX3JhbmdllF2UKEc/0JBhlOsmYEdALf//ymGoy2WMB2ZfcmFuZ2WUXZQoR0FIOJ3kwhAAR0FIovaVU7AAZYwCZGOUSxB1Lg==
+#*# calibration_17 = gASVywMAAAAAAAB9lCiMAXaUSwWMBGZ0b2iUjBtudW1weS5wb2x5bm9taWFsLnBvbHlub21pYWyUjApQb2x5bm9taWFslJOUKYGUfZQojARjb2VmlIwWbnVtcHkuX2NvcmUubXVsdGlhcnJheZSMDF9yZWNvbnN0cnVjdJSTlIwFbnVtcHmUjAduZGFycmF5lJOUSwCFlEMBYpSHlFKUKEsBSwqFlGgMjAVkdHlwZZSTlIwCZjiUiYiHlFKUKEsDjAE8lE5OTkr/////Sv////9LAHSUYolDUIJscEQ9lPU/7iiS16hP/T+hRDzrRYPoP53JLcfQGNU/13WcrW8nxT9IvVRJUbXYP5Dbo9J0Scs/fDxcr1I3yL83Q1Dopahwv+56dLXVUMA/lHSUYowGZG9tYWlulGgLaA5LAIWUaBCHlFKUKEsBSwKFlGgYiUMQts9G+aDLlD7NZKwAqC+VPpR0lGKMBndpbmRvd5RoC2gOSwCFlGgQh5RSlChLAUsChZRoGIlDEAAAAAAAAPC/AAAAAAAA8D+UdJRijAdfc3ltYm9slIwBeJSMBnN5bWJvbJRoLHVijAlmdG9oX2hpZ2iUaAUpgZR9lChoCGgLaA5LAIWUaBCHlFKUKEsBSwqFlGgYiUNQDrNsyqCjGkCsWD71aL8IQEdw1JVgnvs/dyxe7YkxCEAsiNt9JZbgP+sRODMBJh7Ai251b5zE4D9NEyaBP98nQA1vcOAebt4/vfhrkUWrFMCUdJRiaB1oC2gOSwCFlGgQh5RSlChLAUsChZRoGIlDEJfsUaF/LJU+qM2kSxxClT6UdJRiaCRoC2gOSwCFlGgQh5RSlChLAUsChZRoGIlDEAAAAAAAAPC/AAAAAAAA8D+UdJRiaCtoLGgtaCx1YowEaHRvZpRoBSmBlH2UKGgIaAtoDksAhZRoEIeUUpQoSwFLCoWUaBiJQ1DYfVZXSBaVPqVZwK+ojiQ+XZEJYOprFr7loIc/uQkAPt38y0aj2uS91ta2Nxuy4T2tfcSzfMbBvVC+mJ5yLLU9gDocV3nOzD39Wc1P7pvYvZR0lGJoHWgLaA5LAIWUaBCHlFKUKEsBSwKFlGgYiUMQgJbylCADLj9mr5Ge0v8TQJR0lGJoJGgLaA5LAIWUaBCHlFKUKEsBSwKFlGgYiUMQAAAAAAAA8L8AAAAAAADwP5R0lGJoK2gsaC1oLHVijAdoX3JhbmdllF2UKEc/LgMglPKWgEdALf/87KOsZWWMB2ZfcmFuZ2WUXZQoR0FIFbO4/WgAR0FInuy/ibgAZYwCZGOUSxF1Lg==
