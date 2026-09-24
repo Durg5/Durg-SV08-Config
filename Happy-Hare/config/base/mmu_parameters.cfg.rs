@@ -1,6 +1,9 @@
 ########################################################################################################################
 # Happy Hare MMU Software
 #
+# Template file for MMU's with Selector Stepper but no servo (Type-A designs like 3DChameleon)
+# This file omits servo parts of the configuration
+#
 # EDIT THIS FILE BASED ON YOUR SETUP
 #
 # Copyright (C) 2022-2026  moggieuk#6538 (discord)
@@ -36,34 +39,6 @@ selector_max_velocity: 250		# Never to be exceeded selector velocity regardless 
 selector_max_accel: 1200		# Never to be exceeded selector acceleration regardless of specific parameters
 
 
-# Servo configuration  -------------------------------------------------------------------------------------------------
-# ███████╗███████╗██████╗ ██╗   ██╗ ██████╗ 
-# ██╔════╝██╔════╝██╔══██╗██║   ██║██╔═══██╗
-# ███████╗█████╗  ██████╔╝██║   ██║██║   ██║
-# ╚════██║██╔══╝  ██╔══██╗╚██╗ ██╔╝██║   ██║
-# ███████║███████╗██║  ██║ ╚████╔╝ ╚██████╔╝
-# ╚══════╝╚══════╝╚═╝  ╚═╝  ╚═══╝   ╚═════╝ 
-#
-# Angle of the servo in three named positions
-#   up   = tool is selected and filament is allowed to freely move through gate
-#   down = to grip filament
-#   move = ready the servo for selector move (optional - defaults to up)
-# V2.4.0 on: These positions are only for initial config they are replaced with calibrated servo positions in 'mmu_vars.cfg'
-#
-# Note that leaving the servo active when down can stress the electronics and is not recommended with EASY-BRD or ERB board
-# unless the 5v power supply has been improved and it is not necessary with standard ERCF builds
-# Make sure your hardware is suitable for the job!
-#
-servo_up_angle: 145			# ERCF: MG90S: 30  ; SAVOX SH0255MG: 140 ; Tradrack: 145
-servo_down_angle: 30			# ERCF: MG90S: 140 ; SAVOX SH0255MG: 30  ; Tradrack: 1
-servo_move_angle: 109			# Optional angle used when selector is moved (defaults to up position)
-servo_duration: 0.4			# Duration of PWM burst sent to servo (default non-active mode, automatically turns off)
-servo_dwell: 0.5			# Minimum time given to servo to complete movement prior to next move
-servo_always_active: 0 			# CAUTION - WILL DAMAGE COMMON SERVOS, PLEASE USE AT YOUR OWN RISK: 1=Force servo to always stay active, 0=Release after movement
-servo_active_down: 0			# CAUTION - WILL DAMAGE COMMON SERVOS, PLEASE USE AT YOUR OWN RISK: 1=Force servo to stay active when down only, 0=Release after movement
-servo_buzz_gear_on_down: 0		# Whether to "buzz" the gear stepper on down to aid engagement
-
-
 # Logging --------------------------------------------------------------------------------------------------------------
 # ██╗      ██████╗  ██████╗  ██████╗ ██╗███╗   ██╗ ██████╗ 
 # ██║     ██╔═══██╗██╔════╝ ██╔════╝ ██║████╗  ██║██╔════╝ 
@@ -72,7 +47,7 @@ servo_buzz_gear_on_down: 0		# Whether to "buzz" the gear stepper on down to aid 
 # ███████╗╚██████╔╝╚██████╔╝╚██████╔╝██║██║ ╚████║╚██████╔╝
 # ╚══════╝ ╚═════╝  ╚═════╝  ╚═════╝ ╚═╝╚═╝  ╚═══╝ ╚═════╝ 
 #
-# log_level & logfile_level can be set to one of (0 = essential, 1 = info, 2 = debug, 3 = trace, 4 = developer + stepper moves)
+# log_level & logfile_level can be set to one of (0 = essential, 1 = info, 2 = debug, 3 = trace, 4 = stepper moves)
 # Generally you can keep console logging to a minimal whilst still sending debug output to the mmu.log file
 # Increasing the console log level is only really useful during initial setup to save having to constantly open the log file
 # Note: that it is not recommended to keep logging at level greater that 2 (debug) if not debugging an issue because
@@ -100,12 +75,12 @@ log_m117_messages: 1			# Whether send toolchange message via M117 to screen
 # loosing steps). Unloading speed can be tuning if you have a rewinder system that imposes additional limits.
 # NOTE: Encoder cannot keep up much above 450mm/s so make sure 'bowden_apply_correction' is off at very high speeds!
 #
-gear_from_spool_speed: 80		# mm/s Speed when loading from the spool (for the first time if has_filament_buffer: 1)
-gear_from_spool_accel: 100		# Acceleration when loading from spool
-gear_from_buffer_speed: 150		# mm/s Speed when loading filament from buffer. Conservative is 100mm/s, Max around 400mm/s
-gear_from_buffer_accel: 400		# Normal acceleration when loading filament
-gear_unload_speed: 80			# mm/s Use (lower) speed when unloading filament (defaults to "from spool" speed)
-gear_unload_accel: 100			# Acceleration when unloading filament (defaults to "from spool" accel)
+gear_from_spool_speed: 80               # mm/s Speed when loading from the spool (for the first time if has_filament_buffer: 1)
+gear_from_spool_accel: 100              # Acceleration when loading from spool
+gear_from_buffer_speed: 150             # mm/s Speed when loading filament from buffer. Conservative is 100mm/s, Max around 400mm/s
+gear_from_buffer_accel: 400             # Normal acceleration when loading filament
+gear_unload_speed: 80                   # mm/s Use (lower) speed when unloading filament (defaults to "from spool" speed)
+gear_unload_accel: 100                  # Acceleration when unloading filament (defaults to "from spool" accel)
 #
 gear_short_move_speed: 80		# mm/s Speed when making short moves (like incremental retracts with encoder)
 gear_short_move_accel: 600		# Usually the same as gear_from_buffer_accel (for short movements)
@@ -161,15 +136,15 @@ macro_toolhead_min_cruise_ratio: 0.5	# Default printer cruise ratio applied when
 #   extruder      - Use extruder entry sensor (Only for some type-B designs, see [mmu_machine] require_bowden_move setting)
 #
 gate_homing_endstop: encoder		# Name of gate endstop, "encoder" forces use of encoder for parking
-gate_homing_max: 70			# Maximum move distance to home (or actual move distance if encoder endstop)
-gate_parking_distance: 23		# Parking position relative to homing endstop (-ve value means move forward)
-gate_preload_homing_max: 300		# Maximum homing distance to the mmu_gear endstop (if MMU is fitted with one)
-gate_preload_parking_distance: -10	# Parking position relative to mmu_gear endstop (-ve value means move forward) 
-gate_endstop_to_encoder: 10		# Distance between gate endstop and encoder (IF both fitted. +ve if encoder after endstop)
+gate_homing_max: 70			# Maximum move distance to home to the gate (or actual move distance for encoder parking)
+gate_preload_homing_max: 70		# Maximum homing distance to the mmu_gear endstop (if MMU is fitted with one)
+gate_preload_parking_distance: 0	# Parking position relative to mmu_gear endstop (-ve value means move forward) 
 gate_unload_buffer: 50			# Amount to reduce the fast unload so that filament doesn't overshoot when parking
 gate_load_retries: 2			# Number of times MMU will attempt to grab the filament on initial load (type-A designs)
+gate_parking_distance: 23 		# Parking position in the gate (distance back from homing point, -ve value means move forward)
+gate_endstop_to_encoder: 10		# Distance between gate endstop and encoder (IF both fitted. +ve if encoder after endstop)
 gate_autoload: 1			# If pre-gate sensor fitted this controls the automatic loading of the gate
-gate_final_eject_distance: 0		# Additional distance to eject filament on MMU_EJECT to clear MMU grip
+gate_final_eject_distance: 0		# Distance to eject filament on MMU_EJECT (Ignored by MMU_UNLOAD)
 
 
 # Bowden tube loading/unloading ----------------------------------------------------------------------------------------
@@ -222,13 +197,13 @@ bowden_pre_unload_error_tolerance: 50	# ADVANCED: tune pre_unload_test
 # Note that reduced current during collision detection can also prevent unecessary filament griding.
 #
 # Possible extruder_homing_endtop names:
-#   filament_compression - If you have a "sync-feedback" sensor with compression switch configured
-#                          Fast bowden load will move to extruder_homing_buffer distance before extruder gear, then home
-#   extruder             - If you have a "filament entry" endstop configured (Requires 'extruder' endstop)
-#                          Fast bowden load will move to extruder_homing_buffer distance before sensor, then home
 #   collision            - Detect the collision with the extruder gear by monitoring encoder movement (Requires encoder)
 #                          Fast bowden load will move to the extruder gears
 #   mmu_gear_touch       - Use touch detection when the gear stepper hits the extruder (Requires stallguard)
+#                          Fast bowden load will move to extruder_homing_buffer distance before extruder gear, then home
+#   extruder             - If you have a "filament entry" endstop configured (Requires 'extruder' endstop)
+#                          Fast bowden load will move to extruder_homing_buffer distance before sensor, then home
+#   filament_compression - If you have a "sync-feedback" sensor with compression switch configured
 #                          Fast bowden load will move to extruder_homing_buffer distance before extruder gear, then home
 #   none                 - Don't attempt to home. Only possibiliy if lacking all sensor options
 #                          Fast bowden load will move to the extruder gears. Option is fine if using toolhead sensor
@@ -298,14 +273,14 @@ toolhead_ooze_reduction: 0		# Reduction in extruder loading length to prevent oo
 #
 toolhead_unload_safety_margin: 10	# Extra movement safety margin (default: 10mm)
 
-# If not synchronizing gear and extruder and you experience a "false" encoder clog detection immediately after the tool
-# change it might be because of a long bowden and/or large internal diameter that causes slack in the filament. This optional
+# If not synchronizing gear and extruder and you experience a "false" clog detection immediately after the tool change
+# it might be because of a long bowden and/or large internal diameter that causes slack in the filament. This optional
 # move will tighten the filament after a load by % of current clog detection length. Gear stepper will run at 50% current
 #
 toolhead_post_load_tighten: 60		# % of clog detection length, 0 to disable. Ignored if 'sync_to_extruder: 1'
 
-# If synchronizing gear and extruder and you have a sync-feedback "buffer" (switch based or proportional) this setting 
-# determines whether to use it to create neutral tension after loading
+# If synchronizing gear and extruder and you have a sync-feedback "buffer" this setting determines whether to use it
+# to create neutral tension after loading
 toolhead_post_load_tension_adjust: 1	# 1 to enable (recommended), 0 to disable
 
 # If sync-feedback compression sensor is available this test will ensure the filament passes the extruder entry by checking
@@ -348,10 +323,10 @@ toolhead_move_error_tolerance: 60
 # If opting for slicer tip forming you MUST configure where the slicer leaves the filament in the extruder since
 # there is no way to determine this. This can be ignored if all tip forming is performed by Happy Hare
 #
-force_form_tip_standalone: 1		# 0 = Slicer in print else standalone, 1 = Always standalone tip forming (TURN SLICER OFF!)
+force_form_tip_standalone: 1            # 0 = Slicer in print else standalone, 1 = Always standalone tip forming (TURN SLICER OFF!)
 form_tip_macro: _MMU_FORM_TIP           # Name of macro to call to perform the tip forming (or cutting) operation
-extruder_form_tip_current: 100		# % of extruder current (100%-150%) to use when forming tip (100 to disable)
-slicer_tip_park_pos: 0			# This specifies the position of filament in extruder after slicer completes tip forming
+extruder_form_tip_current: 100          # % of extruder current (100%-150%) to use when forming tip (100 to disable)
+slicer_tip_park_pos: 0                  # This specifies the position of filament in extruder after slicer completes tip forming
 
 
 # Purging -------------------------------------------------------------------------------------------------------------
@@ -370,13 +345,13 @@ slicer_tip_park_pos: 0			# This specifies the position of filament in extruder a
 # The default is for no (empty) macro so purging will not be done out of a print and thus wipetower. Two options are shipped with
 # Happy Hare but you can also build your own custom one:
 #   _MMU_PURGE .. default purging that just dumps the desired amount of filament (setup correct parking before enabling this!)
-#   BLOBIFIER  .. for excellent Blobifer addon (https://github.com/Dendrowen/Blobifier)
+#   BLOBIFER   .. for excellent Blobifer addon (https://github.com/Dendrowen/Blobifier)
 #
 # Often it is useful to increase the extruder current for the often rapid puring movement to ensure high torque and no skipped steps
 #
-force_purge_standalone: 0		# 0 = Slicer wipetower in print else standalone, 1 = Always standalone purging (TURN WIPETOWER OFF!)
-purge_macro: 				# Name of macro to call to perform the standalone purging operation. E.g. BLOBIFIER, _MMU_PURGE
-extruder_purge_current: 100		# % of extruder current (100%-150%) to use when purging (100 to disable)
+force_purge_standalone: 0               # 0 = Slicer wipetower in print else standalone, 1 = Always standalone purging (TURN WIPETOWER OFF!)
+purge_macro: _MMU_PURGE			# Name of macro to call to perform the standalone purging operation. E.g. BLOBIFIER, _MMU_PURGE
+extruder_purge_current: 100             # % of extruder current (100%-150%) to use when purging (100 to disable)
 
 
 # Synchronized gear/extruder movement ----------------------------------------------------------------------------------
@@ -405,7 +380,7 @@ sync_purge: 0				# Synchronize during standalone purging (last part of load)
 # If only "one half" of the sync-feedback is available (either compression-only or tension-only) then the rotation
 # distance is always shifted based on the high/low multipliers, however if both tension and compression are available
 # then the rotation distance will autotune to correct setting (recommend you also enable 'autotune_rotation_distance: 1'
-# so that values are saved)
+# Note that proportional feedback sensors are continuously dynamic
 #
 # Possible buffer setups, forth option for type where neutral is when both sensors are active:
 #
@@ -426,7 +401,7 @@ sync_feedback_extrude_threshold: 5	# Extruder movement (mm) for updates (keep sm
 # detection or for getting help on the Happy Hare forum. To plot graph of sync-feedback operation, run:
 #  ~/Happy-Hare/utils/plot_sync_feedback.sh
 #
-sync_feedback_debug_log: 0		# 0 = disable (normal operation), 1 = enable telemetry log (for debugging)
+sync_feedback_debug_log: 0		# 0 = disable (normal opertion), 1 = enable telemetry log (for debugging)
 
 
 # ESpooler control -----------------------------------------------------------------------------------------------------
@@ -533,13 +508,13 @@ flowguard_max_relief: 40
 # Encoder runout/clog/tangle detection watches for movement over either a static or automatically adjusted distance - if
 # no encoder movement is seen when the extruder moves this distance runout/ clog/tangle event will be generated. Allowing
 # the distance to be adjusted automatically (mode=2) will generally allow for a quicker trigger but use a static length
-# (mode=1, set encoder_max_motion) if you get false triggers (see flowguard guide on wiki for more details).
+# (mode=1, set encoder_max_motion) if you get false triggers (see flowguard guide on wiki for more details)
 # Note that this feature cannot disinguish between clog or tangle.
 flowguard_encoder_mode: 2		# 0 = Disable, 1 = Static length clog detection, 2 = Automatic length clog detection
 
 # The encoder_max_motion is the absolute max permitted extruder movement without the encoder seeing movement when using
 # status mode (mode=1). Smaller values are more sensitive but beware of going too small - slack and friction in the
-# bowden may cause gaps in encoder movement. Increase if you have false triggers.
+# bowden may cause gaps in encoder movement. Increase if you have false triggers
 # Note that this value is overriden by any calibrated value stored in 'mmu_vars.cfg' if in automatic mode (mode=2).
 flowguard_encoder_max_motion: 20
 
@@ -660,7 +635,7 @@ console_always_output_full: 1	# 1 = Show full table, 0 = Only show totals out of
 #  autotune_rotation_distance - Requires sync-feedback sensor (aka "buffer") or calibrated encoder. If set then either the
 #                               "autotuner" (sync-feedback buffer) or encoder telemetry will be used to adjust the
 #                               persisted gear rotation distance.
-#  skip_cal_encoder           - Will rely on installed default value (although it can still be calibrated).
+#  skip_cal_encoder           - Will rely on installed default value (although it can still be calibrates).
 #                               Not recommended but allows for easier initial setup especially when 'autotune_encoder'
 #                               is enabled.
 #  autotune_encoder           - NOT IMPLEMENTED YET. Soon!
